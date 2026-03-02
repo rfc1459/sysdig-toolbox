@@ -1,0 +1,87 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sysdig-toolbox
+  labels:
+    app: sysdig-toolbox
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: sysdig-toolbox
+  template:
+    metadata:
+      labels:
+        app: sysdig-toolbox
+    spec:
+      volumes:
+        - name: host-containerd-sock
+          hostPath:
+            path: /var/run/containerd/containerd.sock
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-proc
+          hostPath:
+            path: /proc
+        - name: host-boot
+          hostPath:
+            path: /boot
+        - name: host-lib-modules
+          hostPath:
+            path: /lib/modules
+        - name: host-usr
+          hostPath:
+            path: /usr
+        - name: host-etc
+          hostPath:
+            path: /etc
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostPID: true
+      # Uncomment to deploy the toolbox on control plane nodes (DANGEROUS!)
+      # tolerations:
+      #   - effect: NoSchedule
+      #     key: node-role.kubernetes.io/control-plane
+      containers:
+        - name: sysdig-toolbox
+          image: sysdig/sysdig:latest
+          # The original entrypoint tries to be smart and download prebuilt scap modules
+          # from the internet and load them immediately, we definitely don't want that
+          command:
+            - "/bin/bash"
+          args:
+            - "-c"
+            - "for i in $(ls $HOST_ROOT/usr/src); do ln -s $HOST_ROOT/usr/src/$i /usr/src/$i; done; sleep infinity"
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1024Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          volumeMounts:
+            - mountPath: /host/var/run/containerd/containerd.sock
+              name: host-containerd-sock
+            - mountPath: /host/dev
+              name: host-dev
+            - mountPath: /host/proc
+              name: host-proc
+              readOnly: true
+            - mountPath: /host/boot
+              name: host-boot
+              readOnly: true
+            - mountPath: /host/lib/modules
+              name: host-lib-modules
+              readOnly: true
+            - mountPath: /host/usr
+              name: host-usr
+              readOnly: true
+            - mountPath: /host/etc
+              name: host-etc
+              readOnly: true
